@@ -1,3 +1,4 @@
+import json
 import random
 from threading import Thread
 import threading
@@ -10,7 +11,7 @@ from utils.logger import get_logger
 logger = get_logger("server")
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 valid_words: dict[str, bool] = {}
@@ -18,12 +19,12 @@ valid_word_list: list[str] = []
 
 class GameState:
     def __init__(self):
+        self.starting_lives = 3
         self.teams = [
-            ("Lato", []),
-            ("Biny", [])
+            ["Lato", [], self.starting_lives],
+            ["Biny", [], self.starting_lives]
         ]
         self.spectators: list[str] = []
-        self.undecideds: list[str] = []
         self.sequence_length = (2, 4)
         self.timer_length = 10 # in seconds
         self.pause_time = 0.2 # in seconds
@@ -34,6 +35,18 @@ class GameState:
 
         self.next_turn_stop_event = threading.Event()
         self.next_turn_thread: Thread = None
+
+    def to_dict(self):
+        return {
+            "teams": self.teams,
+            "spectators": self.spectators,
+            "sequence_length": self.sequence_length,
+            "timer_length": self.timer_length,
+            "pause_time": self.pause_time,
+            "current_turn": self.current_turn,
+            "current_sequence": self.current_sequence,
+            "running": self.running,
+        }
 
     def next_turn(self):
         logger.info("Moving to next turn...")
@@ -58,7 +71,8 @@ class GameState:
                     logger.info("Current turn cancelled. Starting new one...")
                     socketio.start_background_task(self.next_turn)
                     return
-            socketio.emit("timeout", {"team": self.teams[self.current_turn]}, room="game_room")
+            self.teams[self.current_turn][2] -= 1
+            socketio.emit("timeout", {"team": self.teams[self.current_turn], "teams": self.teams}, room="game_room")
             socketio.start_background_task(self.next_turn)
     
     def get_random_sequence(self) -> str:
@@ -95,9 +109,9 @@ def handle_join_game(data: dict):
 
     logger.info(f"Player '{player_name}' joined.")
 
-    game.undecideds.append(player_name)
+    game.spectators.append(player_name)
     join_room("game_room")
-    emit("undecideds", {"undecideds": game.undecideds}, room="game_room")
+    emit("spectators", {"spectators": game.spectators}, room="game_room")
 
 @socketio.on("join_team")
 def handle_join_team(data: dict):
@@ -106,10 +120,9 @@ def handle_join_team(data: dict):
 
     logger.info(f"Attempting to add '{player_name}' to the {player_team} team...")
 
-    if player_name in game.undecideds:
-        game.undecideds.remove(player_name)
-    elif player_name in game.spectators:
+    if player_name in game.spectators:
         game.spectators.remove(player_name)
+        emit("spectators", {"spectators": game.spectators}, room="game_room")
     for i, team in enumerate(game.teams):
         if team[0] == player_team:
             logger.info(f"Player '{player_name}' joined the {player_team} team.")
@@ -138,7 +151,10 @@ def handle_word_submission(data: dict):
     else:
         socketio.emit("invalid_word", {"team": team, "player": player, "word": word}, room="game_room")
 
-# Start the game
+@app.route("/get_state", methods=["GET"])
+def get_state():
+    return jsonify(game.to_dict())
+
 @app.route("/start", methods=["POST"])
 def start_game():
     if not game.running:
