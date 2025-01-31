@@ -1,4 +1,3 @@
-import json
 import random
 from threading import Thread
 import threading
@@ -29,8 +28,9 @@ class GameState:
         self.timer_length = 10 # in seconds
         self.pause_time = 0.2 # in seconds
 
-        self.current_turn = 0
+        self.current_turn = -1
         self.current_sequence = ""
+        self.current_sequence_failures = 0
         self.running = False
 
         self.next_turn_stop_event = threading.Event()
@@ -52,13 +52,14 @@ class GameState:
         logger.info("Moving to next turn...")
 
         self.current_turn = (self.current_turn + 1) % len(self.teams)
-        self.current_sequence = self.get_random_sequence()
+        if not (0 < self.current_sequence_failures < len(self.teams)):
+            self.current_sequence = self.get_random_sequence()
         socketio.emit("turn_change", {"next_team": self.teams[self.current_turn], "sequence": self.current_sequence}, room="game_room")
 
         if not self.running:
             logger.info("Started game...")
             self.running = True
-            socketio.emit("game_started", room="game_room")
+            socketio.emit("game_started", {"teams": self.teams}, room="game_room")
 
         self.start_timer()
 
@@ -72,8 +73,33 @@ class GameState:
                     socketio.start_background_task(self.next_turn)
                     return
             self.teams[self.current_turn][2] -= 1
+            self.current_sequence_failures += 1
             socketio.emit("timeout", {"team": self.teams[self.current_turn], "teams": self.teams}, room="game_room")
-            socketio.start_background_task(self.next_turn)
+
+            last_team = self.one_team_remaining()
+            if last_team:
+                socketio.emit("game_over", {"team": last_team})
+                self.running = False
+            else:
+                socketio.start_background_task(self.next_turn)
+
+    def one_team_remaining(self) -> list | bool:
+        """
+        Returns the last team remaining.
+        Returns False if more than one team is remaining.
+        """
+
+        alive_team = None
+        for team in self.teams:
+            if team[2] > 0:
+                if alive_team is not None:
+                    return False
+                alive_team = team
+        return alive_team
+    
+    def reset_scores(self):
+        for i in range(len(self.teams)):
+            self.teams[i][2] = self.starting_lives
     
     def get_random_sequence(self) -> str:
         """
@@ -146,6 +172,7 @@ def handle_word_submission(data: dict):
 
     if valid_words.get(word, False) and game.current_sequence in word:
         logger.info(f"{game.current_sequence} is in {word}.")
+        game.current_sequence_failures = 0
         socketio.emit("valid_word", {"team": team, "player": player, "word": word}, room="game_room")
         game.next_turn_stop_event.set()
     else:
@@ -157,7 +184,9 @@ def get_state():
 
 @app.route("/start", methods=["POST"])
 def start_game():
+    global game
     if not game.running:
+        game.reset_scores()
         game.next_turn_thread = socketio.start_background_task(game.next_turn)
         return jsonify({"message": "Game started!"})
     return jsonify({"message": "Game is already running!"})

@@ -27,6 +27,9 @@ const Game = () => {
   const [word, setWord] = useState("");
   const [undecided, setUndecided] = useState(true);
 
+  // ui
+  const [statusMessage, setStatusMessage] = useState("")
+
   useEffect(() => {
     socket.on("teams", (data) => {
       setTeams(data.teams);
@@ -36,7 +39,8 @@ const Game = () => {
       setSpectators(data.spectators);
     });
 
-    socket.on("game_started", () => {
+    socket.on("game_started", (data) => {
+      setTeams(data.teams)
       setGameStarted(true);
     });
 
@@ -47,18 +51,26 @@ const Game = () => {
     });
 
     socket.on("valid_word", (data) => {
+      setStatusMessage(`${data.player} submitted a VALID word: ${data.word}`)
       console.log(`${data.player} from ${data.team} submitted a valid word: ${data.word}`);
     });
 
     socket.on("invalid_word", (data) => {
+      setStatusMessage(`${data.player} submitted an INVALID word: ${data.word}`)
       console.log(`${data.player} from ${data.team} submitted an invalid word: ${data.word}`);
     });
 
     socket.on("timeout", (data) => {
-      console.log(`Time's up! Team ${data.team} ran out of time.`);
       setTeams(data.teams)
       setTimerKey(Date.now() + timerLength * 1000);
-      console.log(timerLength)
+      setStatusMessage(`${data.team[0]} lost a life! 💔`)
+      console.log(`Time's up! Team ${data.team[0]} ran out of time.`);
+    });
+
+    socket.on("game_over", (data) => {
+      setTimerKey(Date.now());
+      setStatusMessage(`Team ${data.team[0]} won!`)
+      console.log(`Team ${data.team[0]} won!`);
     });
 
     const fetchGameData = async () => {
@@ -135,20 +147,23 @@ const Game = () => {
           {!playerTeam ? (
             <EnterName setPlayerName={setPlayerName} joinGame={joinGame} />
           ) : (
-            <GameInterface
-              playerName={playerName}
-              playerTeam={playerTeam}
-              undecided={undecided}
-              joinTeam={joinTeam}
-              gameStarted={gameStarted}
-              currentTeam={currentTeam}
-              currentSequence={currentSequence}
-              word={word}
-              setWord={setWord}
-              submitWord={submitWord}
-              startGame={startGame}
-              timerKey={timerKey}
-            />
+            <Container className="center-content">
+              <GameInterface
+                playerName={playerName}
+                playerTeam={playerTeam}
+                undecided={undecided}
+                joinTeam={joinTeam}
+                gameStarted={gameStarted}
+                currentTeam={currentTeam}
+                currentSequence={currentSequence}
+                word={word}
+                setWord={setWord}
+                submitWord={submitWord}
+                startGame={startGame}
+                timerKey={timerKey}
+              />
+              <h3>{statusMessage}</h3>
+            </Container>
           )}
         </Col>
 
