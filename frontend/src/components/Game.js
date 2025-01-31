@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Countdown from 'react-countdown';
 import io from "socket.io-client";
 import TeamDisplay from "./TeamDisplay";
@@ -30,7 +30,14 @@ const Game = () => {
   // ui
   const [statusMessage, setStatusMessage] = useState("")
 
+  // persistent info
+  const nameRef = useRef(playerName);
+  const teamRef = useRef(playerTeam);
+
   useEffect(() => {
+    nameRef.current = playerName;
+    teamRef.current = playerTeam;
+
     socket.on("teams", (data) => {
       setTeams(data.teams);
     });
@@ -51,12 +58,20 @@ const Game = () => {
     });
 
     socket.on("valid_word", (data) => {
-      setStatusMessage(`${data.player} submitted a VALID word: ${data.word}`)
+      setStatusMessage(`✅ ${data.player} submitted a VALID word: ${data.word}`)
       console.log(`${data.player} from ${data.team.name} submitted a valid word: ${data.word}`);
     });
 
     socket.on("invalid_word", (data) => {
-      setStatusMessage(`${data.player} submitted an INVALID word: ${data.word}`)
+      if (data.reason === "not_in_dictionary") {
+        setStatusMessage(`❌ ${data.player} submitted '${data.word}', which isn't a valid word.`)
+      }
+      else if (data.reason === "sequence_not_in_word") {
+        setStatusMessage(`❌ ${data.player} submitted '${data.word}', which doesn't include the sequence.`)
+      }
+      else if (data.reason === "word_already_used") {
+        setStatusMessage(`❌ ${data.player} submitted '${data.word}', which has already been used.`)
+      }
       console.log(`${data.player} from ${data.team.name} submitted an invalid word: ${data.word}`);
     });
 
@@ -73,13 +88,11 @@ const Game = () => {
       console.log(`Team ${data.team.name} won!`);
     });
 
-    const preventUnload = (event) => {
-      const message = 'Sure you want to leave?';
-      event.preventDefault();
-      event.returnValue = message;
+    const beforeLeave = (event) => {
+      socket.emit("leave_game", { name: nameRef.current, team: teamRef.current });
     };
   
-    window.addEventListener('beforeunload', preventUnload);
+    window.addEventListener('beforeunload', beforeLeave);
 
     const fetchGameData = async () => {
       try {
@@ -107,9 +120,9 @@ const Game = () => {
       socket.off("valid_word");
       socket.off("invalid_word");
       socket.off("timeout");
-      window.removeEventListener('beforeunload', preventUnload);
+      window.removeEventListener('beforeunload', beforeLeave);
     };
-  }, []);
+  }, [playerName, playerTeam]);
 
   const joinGame = () => {
     if (playerName) {

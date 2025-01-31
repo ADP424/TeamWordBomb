@@ -13,11 +13,13 @@ class GameState:
     def __init__(self, socketio: SocketIO):
         self.socketio = socketio
 
-        self.valid_words: dict[str, bool] = {}
-        self.valid_words_list: list[str] = []
-
         logger.info("Loading valid words...")
+        self.valid_words: dict[str, bool] = {}
         self.load_valid_words()
+
+        logger.info("Loading sequences...")
+        self.sequences: list[str] = []
+        self.load_sequences()
 
         self.starting_lives = 3
         self.teams = [
@@ -93,6 +95,48 @@ class GameState:
         team = self.get_team(team_name)
         return team.add_player(player_name)
 
+    def remove_player_from_team(self, team_name: str, player_name: str):
+        """
+        Remove the given player from the given team.
+        """
+
+        team = self.get_team(team_name)
+        team.players.remove(player_name)
+
+    def submit_word(self, team_name: str, player_name: str, word: str):
+        """
+        Submit a word and emit the submission to all listeners.
+        """
+
+        team = self.get_team(team_name)
+        if not self.valid_words.get(word, False):
+            self.socketio.emit(
+                "invalid_word",
+                {"team": team.to_dict(), "player": player_name, "word": word, "reason": "not_in_dictionary"},
+                room="game_room",
+            )
+        elif not self.current_sequence in word:
+            self.socketio.emit(
+                "invalid_word",
+                {"team": team.to_dict(), "player": player_name, "word": word, "reason": "sequence_not_in_word"},
+                room="game_room",
+            )
+        elif word in self.used_words:
+            self.socketio.emit(
+                "invalid_word",
+                {"team": team.to_dict(), "player": player_name, "word": word, "reason": "word_already_used"},
+                room="game_room",
+            )
+        else:
+            self.current_sequence_failures = 0
+            self.used_words[word] = True
+            self.socketio.emit(
+                "valid_word",
+                {"team": team.to_dict(), "player": player_name, "word": word, "reason": "valid"},
+                room="game_room",
+            )
+            self.next_turn_stop_event.set()
+
     def one_team_remaining(self) -> Team | bool:
         """
         Returns the last team remaining.
@@ -116,17 +160,10 @@ class GameState:
 
     def get_random_sequence(self) -> str:
         """
-        Return a random sequence of letters found in a random valid word.
+        Return a random sequence from `sequences_300.txt`.
         """
 
-        random_word: str = random.choice(self.valid_words_list)
-        sequence_length = random.randint(self.sequence_length[0], self.sequence_length[1])
-        max_starting_char = len(random_word) - sequence_length
-        if max_starting_char >= 0:
-            starting_char = random.randint(0, max_starting_char)
-            return random_word[starting_char : starting_char + sequence_length]
-        else:
-            return random_word
+        return random.choice(self.sequences)
 
     def get_team(self, team_name: str) -> Team | None:
         """
@@ -145,7 +182,16 @@ class GameState:
             for line in valid_words_file.readlines():
                 word = line.strip()
                 self.valid_words[word] = True
-        self.valid_words_list = list(self.valid_words.keys())
+
+    def load_sequences(self):
+        """
+        Do a one time load of all the sequences into the list.
+        """
+
+        with open("server/resources/sequences_300.txt", "r") as sequences_file:
+            for line in sequences_file.readlines():
+                seq = line.strip()
+                self.sequences.append(seq)
 
     def to_dict(self):
         return {

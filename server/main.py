@@ -28,16 +28,18 @@ def handle_join_game(data: dict):
 @socketio.on("leave_game")
 def handle_leave_game(data: dict):
     player_name = data["name"]
+    team_name = data["team"]
 
-    for team in game.teams:
-        if player_name in team.players:
-            logger.info(f"Player '{player_name}' joined.")
+    logger.info(f"{player_name}, {team_name}")
 
-    logger.info(f"Player '{player_name}' joined.")
-
-    game.spectators.append(player_name)
-    join_room("game_room")
-    emit("spectators", {"spectators": game.spectators}, room="game_room")
+    if team_name == "Spectator":
+        game.spectators.remove(player_name)
+        emit("spectators", {"spectators": game.spectators}, room="game_room")
+        logger.info(f"Player '{player_name}' left.")
+    elif team_name is not None:
+        game.remove_player_from_team(team_name, player_name)
+        emit("teams", {"teams": game.teams_to_dict_array()}, room="game_room")
+        logger.info(f"Player '{player_name}' left.")
 
 
 @socketio.on("join_team")
@@ -62,23 +64,17 @@ def handle_join_team(data: dict):
 # Handle word submission
 @socketio.on("submit_word")
 def handle_word_submission(data: dict):
-    word = data["word"].upper()
-    team = game.get_team(data["team"])
-    player = data["player"]
+    word = data["word"].lower()
+    team_name = data["team"]
+    player_name = data["player"]
 
-    logger.info(f"Player {player} from Team {team} submitted '{word}'.")
+    logger.info(f"Player {player_name} from Team {team_name} submitted '{word}'.")
 
-    if team.name != game.teams[game.current_turn].name:
+    if team_name != game.teams[game.current_turn].name:
         logger.info("That player is not on the current team.")
         return
 
-    if game.valid_words.get(word, False) and game.current_sequence in word:
-        logger.info(f"{game.current_sequence} is in {word}.")
-        game.current_sequence_failures = 0
-        socketio.emit("valid_word", {"team": team.to_dict(), "player": player, "word": word}, room="game_room")
-        game.next_turn_stop_event.set()
-    else:
-        socketio.emit("invalid_word", {"team": team.to_dict(), "player": player, "word": word}, room="game_room")
+    game.submit_word(team_name, player_name, word)
 
 
 @app.route("/get_state", methods=["GET"])
