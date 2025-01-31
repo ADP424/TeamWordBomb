@@ -115,7 +115,7 @@ class GameState:
                 {"team": team.to_dict(), "player": player_name, "word": word, "reason": "not_in_dictionary"},
                 room="game_room",
             )
-        elif not self.current_sequence in word:
+        elif self.current_sequence not in word:
             self.socketio.emit(
                 "invalid_word",
                 {"team": team.to_dict(), "player": player_name, "word": word, "reason": "sequence_not_in_word"},
