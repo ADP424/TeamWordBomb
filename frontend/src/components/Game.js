@@ -9,7 +9,7 @@ import Col from "react-bootstrap/Col";
 import Row from "react-bootstrap/Row";
 import Card from "react-bootstrap/Card";
 
-const URL = "http://teamwordbomb-production.up.railway.app"
+const URL = "https://teamwordbomb-production.up.railway.app"
 
 const socket = io(URL);
 
