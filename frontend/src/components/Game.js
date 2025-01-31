@@ -52,26 +52,34 @@ const Game = () => {
 
     socket.on("valid_word", (data) => {
       setStatusMessage(`${data.player} submitted a VALID word: ${data.word}`)
-      console.log(`${data.player} from ${data.team} submitted a valid word: ${data.word}`);
+      console.log(`${data.player} from ${data.team.name} submitted a valid word: ${data.word}`);
     });
 
     socket.on("invalid_word", (data) => {
       setStatusMessage(`${data.player} submitted an INVALID word: ${data.word}`)
-      console.log(`${data.player} from ${data.team} submitted an invalid word: ${data.word}`);
+      console.log(`${data.player} from ${data.team.name} submitted an invalid word: ${data.word}`);
     });
 
     socket.on("timeout", (data) => {
       setTeams(data.teams)
       setTimerKey(Date.now() + timerLength * 1000);
-      setStatusMessage(`${data.team[0]} lost a life! 💔`)
-      console.log(`Time's up! Team ${data.team[0]} ran out of time.`);
+      setStatusMessage(`${data.team.name} lost a life! 💔`)
+      console.log(`Time's up! Team ${data.team.name} ran out of time.`);
     });
 
     socket.on("game_over", (data) => {
       setTimerKey(Date.now());
-      setStatusMessage(`Team ${data.team[0]} won!`)
-      console.log(`Team ${data.team[0]} won!`);
+      setStatusMessage(`Team ${data.team.name} won!`)
+      console.log(`Team ${data.team.name} won!`);
     });
+
+    const preventUnload = (event) => {
+      const message = 'Sure you want to leave?';
+      event.preventDefault();
+      event.returnValue = message;
+    };
+  
+    window.addEventListener('beforeunload', preventUnload);
 
     const fetchGameData = async () => {
       try {
@@ -99,6 +107,7 @@ const Game = () => {
       socket.off("valid_word");
       socket.off("invalid_word");
       socket.off("timeout");
+      window.removeEventListener('beforeunload', preventUnload);
     };
   }, []);
 
@@ -246,7 +255,7 @@ const SelectTeam = ({ joinTeam }) => (
 
 const WordSubmission = ({ currentTeam, currentSequence, word, setWord, submitWord, timerKey }) => (
   <div>
-    <h3>Current Turn: {currentTeam?.[0]}</h3>
+    <h3>Current Turn: {currentTeam?.name}</h3>
     <Countdown
       key={timerKey}
       date={timerKey}

@@ -1,5 +1,6 @@
 import logging
 
+
 class ColorFormatter(logging.Formatter):
     GREY = "\033[38;5;248m"
     PURPLE = "\033[38;5;129m"
@@ -12,6 +13,7 @@ class ColorFormatter(logging.Formatter):
         record.name = f"{self.BLUE}{record.name}{self.RESET}"
         record.message = record.getMessage()
         return f"{record.asctime} {record.levelname} — {record.name} — {record.message}"
+
 
 def get_logger(name):
     logger = logging.getLogger(name)

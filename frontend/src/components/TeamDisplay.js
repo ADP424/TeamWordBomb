@@ -15,9 +15,9 @@ const TeamDisplay = ({ teams, spectators }) => {
                         <Card.Body>
                             {teams.map((team, index) => (
                                 <div key={index} className="mb-3">
-                                    <h5>{team[0]} ({team[2] > 0 ? "❤️ " + team[2] : "💀"})</h5>
+                                    <h5>{team.name} ({team.lives > 0 ? "❤️ " + team.lives : "💀"})</h5>
                                     <ul>
-                                        {team[1].map((player, playerIndex) => (
+                                        {team.players.map((player, playerIndex) => (
                                             <li key={playerIndex}>{player}</li>
                                         ))}
                                     </ul>
