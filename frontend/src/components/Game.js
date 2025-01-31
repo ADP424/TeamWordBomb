@@ -9,7 +9,9 @@ import Col from "react-bootstrap/Col";
 import Row from "react-bootstrap/Row";
 import Card from "react-bootstrap/Card";
 
-const socket = io("http://localhost:5000");
+const URL = "http://teamwordbomb-production.up.railway.app"
+
+const socket = io(URL);
 
 const Game = () => {
   // game info
@@ -96,7 +98,7 @@ const Game = () => {
 
     const fetchGameData = async () => {
       try {
-        const response = await fetch("http://localhost:5000/get_state", {
+        const response = await fetch(`${URL}/get_state`, {
           method: "GET",
         });
         const gameState = await response.json();
@@ -143,7 +145,7 @@ const Game = () => {
 
   const startGame = async () => {
     try {
-      const response = await fetch("http://localhost:5000/start", {
+      const response = await fetch(`${URL}/start`, {
         method: "POST",
       });
       const data = await response.json();

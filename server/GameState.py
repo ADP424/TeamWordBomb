@@ -20,25 +20,14 @@ class GameState:
         logger.info("Loading sequences...")
         self.sequences: list[str] = []
         self.load_sequences()
-
+        
         self.starting_lives = 3
         self.teams = [
             Team("Lato", self.starting_lives),
             Team("Biny", self.starting_lives),
         ]
-        self.spectators: list[str] = []
-        self.sequence_length = (2, 4)
-        self.timer_length = 10  # in seconds
-        self.pause_time = 0.2  # in seconds
 
-        self.current_turn = -1
-        self.current_sequence = ""
-        self.current_sequence_failures = 0
-        self.used_words: dict[str, bool] = {}
-        self.running = False
-
-        self.next_turn_stop_event = threading.Event()
-        self.next_turn_thread: threading.Thread = None
+        self.reset()
 
     def next_turn(self):
         logger.info("Moving to next turn...")
@@ -155,8 +144,20 @@ class GameState:
         for i in range(len(self.teams)):
             self.teams[i].alive = True
             self.teams[i].lives = self.starting_lives
-        self.used_words = {}
+        
+        self.spectators: list[str] = []
+        self.sequence_length = (2, 4)
+        self.timer_length = 10  # in seconds
+        self.pause_time = 0.2  # in seconds
+
         self.current_turn = -1
+        self.current_sequence = ""
+        self.current_sequence_failures = 0
+        self.used_words: dict[str, bool] = {}
+        self.running = False
+
+        self.next_turn_stop_event = threading.Event()
+        self.next_turn_thread: threading.Thread = None
 
     def get_random_sequence(self) -> str:
         """
