@@ -178,7 +178,7 @@ class GameState:
         Do a one time load of all the valid words into the dictionary.
         """
 
-        with open("server/resources/valid_words.txt", "r") as valid_words_file:
+        with open("resources/valid_words.txt", "r") as valid_words_file:
             for line in valid_words_file.readlines():
                 word = line.strip()
                 self.valid_words[word] = True
@@ -188,7 +188,7 @@ class GameState:
         Do a one time load of all the sequences into the list.
         """
 
-        with open("server/resources/sequences_300.txt", "r") as sequences_file:
+        with open("resources/sequences_300.txt", "r") as sequences_file:
             for line in sequences_file.readlines():
                 seq = line.strip()
                 self.sequences.append(seq)
